@@ -99,6 +99,107 @@ point_data points_raw[] = {
   { 2265.0, 174.0, 2.822, 0.0, 1.486 }
 };
 
+class functionObject
+{
+  private:
+    double _xp, _yp;
+    double _x3d, _y3d, _z3d;
+    int _indx;
+  public:
+    functionObject(double xp, double yp, double x3d, double y3d, double z3d,
+        int indx) : _xp(xp), _yp(yp), _x3d(x3d), _y3d(y3d), _z3d(z3d),
+        _indx(indx) {}
+
+    double xp()
+    {
+      return _xp;
+    }
+
+    double yp()
+    {
+      return _yp;
+    }
+
+    double x3d()
+    {
+      return _x3d;
+    }
+
+    double y3d()
+    {
+      return _y3d;
+    }
+
+    double z3d()
+    {
+      return _z3d;
+    }
+
+    double operator()(Eigen::VectorXd& beta)
+    {
+      double ret;
+
+      if(_indx % 2 == 0)
+      {
+        ret = _xp - EvalBackProject(beta);
+      }
+      else
+      {
+        ret = _yp - EvalBackProject(beta);
+      }
+
+      //printf("_xp %f _yp %f\n", _xp, _yp);
+      //printf("EvalBackProject(beta) %f\n", EvalBackProject(beta));
+      return ret;
+    }
+
+    double EvalBackProject(Eigen::VectorXd& beta)
+    {
+      double k = beta[0];
+      double tx = beta[1];
+      double ty = beta[2];
+      double tz = beta[3];
+      double rx = beta[4] * DEG_TO_RAD; 
+      double ry = beta[5] * DEG_TO_RAD;
+      double rz = beta[6] * DEG_TO_RAD;
+
+      Eigen::Affine3d rya = Eigen::Affine3d(Eigen::AngleAxisd(-ry,
+          Eigen::Vector3d::UnitY()));
+      Eigen::Affine3d rxa = Eigen::Affine3d(Eigen::AngleAxisd(-rx,
+          Eigen::Vector3d::UnitX()));
+      Eigen::Affine3d rza = Eigen::Affine3d(Eigen::AngleAxisd(-rz,
+          Eigen::Vector3d::UnitZ()));
+      Eigen::Affine3d t1(Eigen::Translation3d(-tx, -ty, -tz));
+
+      Eigen::Matrix4d m4 = (rza * rxa * rya * t1).matrix();
+      Eigen::Vector3d pn(_x3d, _y3d, _z3d);
+      Eigen::Vector4d pnh = pn.homogeneous();
+      Eigen::Vector4d pnh2 = m4 * pnh;
+      Eigen::Vector3d pn2 = pnh2.hnormalized();
+
+      /* handle case when point is behind camera */
+      if(pn2[2] > 0.0)
+      {
+        return 1.e10;
+      }
+
+      double ret;
+      if(_indx % 2 == 0)
+      {
+        ret = k * pn2[0] / -pn2[2];
+      }
+      else
+      {
+        ret = k * pn2[1] / -pn2[2];
+      }
+
+      return ret;
+    }
+};
+
+typedef std::vector<functionObject> function_object_list;
+
+
 // Print x_screen y_screen x_3d y_3d z_3d for each point
 
 void PointDataListPrint3(point_data_list& a)
@@ -192,24 +293,25 @@ double EvalBackProject(point_data_list& points, Eigen::VectorXd& beta, int i)
 
 // Prints data
 
-void PointDataListPrint4(point_data_list& a, Eigen::VectorXd& vbeta)
+void PointDataListPrint4(function_object_list& r, Eigen::VectorXd& beta)
 {
   std::cout << std::endl << "type: Point_Data_List2" << std::endl;
-  int size = a.size();
+  int size = r.size() >> 1;
   std::cout << "num elements: " << size << std::endl;
 
   std::cout.setf(std::ios::fixed, std::ios::floatfield);
   std::cout.precision(6);
   for(int i = 0;i < size;i++)
   {
-    std::cout << std::setw(12) << a[i].xp << " " << \
-      std::setw(12) << a[i].yp << "   (" << \
-      std::setw(12) << EvalBackProject(a, vbeta, 2 * i) << \
+    int i2 = 2 * i;
+    std::cout << std::setw(12) << r[i2].xp() << " " << \
+      std::setw(12) << r[i2].yp() << "   (" << \
+      std::setw(12) << r[i2].EvalBackProject(beta) << \
       " " << std::setw(12) << \
-      EvalBackProject(a, vbeta, 2 * i + 1) << ")    " << \
-      std::setw(12) << a[i].x << " " << \
-      std::setw(12) << a[i].y << " " << \
-      std::setw(12) << a[i].z << std::endl;
+      r[i2 + 1].EvalBackProject(beta) << ")    " << \
+      std::setw(12) << r[i2].x3d() << " " << \
+      std::setw(12) << r[i2].y3d() << " " << \
+      std::setw(12) << r[i2].z3d() << std::endl;
   }
 
   return;
@@ -217,18 +319,18 @@ void PointDataListPrint4(point_data_list& a, Eigen::VectorXd& vbeta)
 
 // Evaluate function r[i]
 
-double EvalRFunction(int i, point_data_list& points, Eigen::VectorXd& vbeta)
+double EvalRFunction(int i, point_data_list& points, Eigen::VectorXd& beta)
 {
   double ret;
 
   int i2 = i / 2;
   if(i % 2 == 0)
   {
-    ret = points[i2].xp - EvalBackProject(points, vbeta, i);
+    ret = points[i2].xp - EvalBackProject(points, beta, i);
   }
   else
   {
-    ret = points[i2].yp - EvalBackProject(points, vbeta, i);
+    ret = points[i2].yp - EvalBackProject(points, beta, i);
   }
 
   return ret;
@@ -237,14 +339,14 @@ double EvalRFunction(int i, point_data_list& points, Eigen::VectorXd& vbeta)
 
 // Evaluate r function vector
 
-Eigen::VectorXd EvalRFunctionVector(point_data_list& points, Eigen::VectorXd& vbeta)
+Eigen::VectorXd EvalRFunctionVector(function_object_list& r, Eigen::VectorXd& beta)
 {
-  int num_conds = 2 * points.size();
+  int num_conds = r.size();
   Eigen::VectorXd ret(num_conds);
 
   for(int i = 0;i < num_conds;i++)
   {
-    ret[i] = EvalRFunction(i, points, vbeta);
+    ret[i] = r[i](beta);
   }
 
   return ret;
@@ -253,16 +355,16 @@ Eigen::VectorXd EvalRFunctionVector(point_data_list& points, Eigen::VectorXd& vb
 
 // Get partial derivative
 
-double GetPartialD(int i, int indx, point_data_list& points,
-    Eigen::VectorXd& vbeta)
+double GetPartialD(int i, int indx, function_object_list& r,
+    Eigen::VectorXd& beta)
 {
   double epsilon = 0.001;
 
-  Eigen::VectorXd vbeta_epsilon = vbeta;
-  vbeta_epsilon[indx] += epsilon;
+  Eigen::VectorXd beta_epsilon = beta;
+  beta_epsilon[indx] += epsilon;
 
-  double ret = EvalBackProject(points, vbeta, i);
-  double ret_epsilon = EvalBackProject(points, vbeta_epsilon, i);
+  double ret = r[i].EvalBackProject(beta);
+  double ret_epsilon = r[i].EvalBackProject(beta_epsilon);
 
   double partd = (ret_epsilon - ret) / epsilon;
 
@@ -272,16 +374,16 @@ double GetPartialD(int i, int indx, point_data_list& points,
 
 // Calculate Jacobian
 
-Eigen::MatrixXd Jacobian(point_data_list& points, Eigen::VectorXd& vbeta)
+Eigen::MatrixXd Jacobian(function_object_list& r, Eigen::VectorXd& beta)
 {
-  int num_conds = 2 * points.size();
-  Eigen::MatrixXd ret(num_conds, vbeta.size());
+  int num_conds = r.size();
+  Eigen::MatrixXd ret(num_conds, beta.size());
 
   for(int i = 0;i < num_conds;i++)
   {
-    for(int j = 0;j < vbeta.size();j++)
+    for(int j = 0;j < beta.size();j++)
     {
-      ret(i, j) = GetPartialD(i, j, points, vbeta);
+      ret(i, j) = GetPartialD(i, j, r, beta);
     }
   }
 
@@ -291,12 +393,12 @@ Eigen::MatrixXd Jacobian(point_data_list& points, Eigen::VectorXd& vbeta)
 
 // Calculates the error of the function vector.
 
-double CalcErr2(point_data_list& points, Eigen::VectorXd vbeta)
+double CalcErr2(function_object_list& r, Eigen::VectorXd beta)
 {
   double err2;
   Eigen::VectorXd r_vec;
 
-  r_vec = EvalRFunctionVector(points, vbeta);
+  r_vec = EvalRFunctionVector(r, beta);
   err2 = GetErr2(r_vec);
 
   return err2;
@@ -320,8 +422,7 @@ double CalcErr2(point_data_list& points, Eigen::VectorXd vbeta)
 //  (J^T*J)^-1*J^T * r(beta_current)
 //
 
-Eigen::VectorXd CalcDiff(point_data_list& points2,
-  Eigen::VectorXd& vbeta, double *err2)
+Eigen::VectorXd CalcDiff(function_object_list& r, Eigen::VectorXd& beta)
 {
   Eigen::VectorXd vcol;
   Eigen::MatrixXd ejf;
@@ -331,7 +432,7 @@ Eigen::VectorXd CalcDiff(point_data_list& points2,
   Eigen::MatrixXd ejf3;
   Eigen::VectorXd ediff;
 
-  ejf = Jacobian(points2, vbeta);
+  ejf = Jacobian(r, beta);
   ejft = ejf.transpose();
   ejf2 = ejft * ejf;
 
@@ -339,8 +440,7 @@ Eigen::VectorXd CalcDiff(point_data_list& points2,
 
   ejf3 = ejf_inv * ejft;
 
-  vcol = EvalRFunctionVector(points2, vbeta);
-  *err2 = GetErr2(vcol);
+  vcol = EvalRFunctionVector(r, beta);
 
   ediff = ejf3 * vcol;
 
@@ -352,14 +452,12 @@ Eigen::VectorXd CalcDiff(point_data_list& points2,
 //  "dialling back" the next iteration of the beta vector until it's less
 //  than the current beta vector.
 
-Eigen::VectorXd Solve(point_data_list& points2, Eigen::VectorXd& vbeta)
+Eigen::VectorXd Solve(function_object_list& r, Eigen::VectorXd& beta)
 {
-  double atten;
-  double err2;
-  double new_err2;
+  double err2_next;
   Eigen::VectorXd ediff;
-  Eigen::VectorXd ediff1;
-  Eigen::VectorXd vbeta_next;
+  Eigen::VectorXd beta_next;
+  Eigen::VectorXd beta_min;
 
   std::cout << "Here in Solve" << std::endl;
 
@@ -368,41 +466,41 @@ Eigen::VectorXd Solve(point_data_list& points2, Eigen::VectorXd& vbeta)
   {
     std::cout << "iteration " << j << std::endl;
 
-    std::cout << "VBETA" << std::endl;
-    std::cout << vbeta << std::endl;
+    std::cout << "BETA" << std::endl;
+    std::cout << beta << std::endl;
     std::cout << std::endl;
 
-    ediff = CalcDiff(points2, vbeta, &err2);
+    double err2 = CalcErr2(r, beta);
+    ediff = CalcDiff(r, beta);
 
-    std::cout << "err2 " << err2 << std::endl;
+    std::cout << "err2 (orig) " << err2 << std::endl;
 
-                ediff1 = ediff;
-
-    atten = 1.0;
-    for(int j1 = 0;j1 < 10;j1++)
+    double atten = 1.0;
+    double err2_min = err2;
+    beta_min = beta;
+    for(int j1 = 0;j1 < 20;j1++)
     {
-      for(int j2 = 0;j2 < ediff.rows();j2++)
-      {
-        ediff1(j2, 0) = atten * ediff(j2, 0);
-      }
+      beta_next = atten * ediff + beta;
 
-      vbeta_next = ediff1 + vbeta;
-
-      new_err2 = CalcErr2(points2, vbeta_next);
-      if(new_err2 < err2)
+      err2_next = CalcErr2(r, beta_next);
+      std::cout << "j1 " << j1 << " atten " << atten << " err2_next " << err2_next << std::endl;
+      if(err2_next < err2_min)
       {
-        break;
+        err2_min = err2_next;
+        beta_min = beta_next;
+        atten *= 0.7;
+        //break;
       }
       else
       {
-        atten *= 0.5;
+        atten *= 0.7;
       }
     }
 
-    vbeta = vbeta_next;
+    beta = beta_min;
 
     // stop iterating if the error is almost zero
-    if(new_err2 < 0.0000001)
+    if(err2_min < 0.0000001)
     {
       std::cout << "solved" << std::endl;
 
@@ -410,21 +508,21 @@ Eigen::VectorXd Solve(point_data_list& points2, Eigen::VectorXd& vbeta)
     }
 
     // stop iterating if the error has decreased minimally
-    if(new_err2 / err2 > 0.99999)
+    if(err2_min / err2 > 0.99999)
     {
       std::cout << "converged" << std::endl;
 
       break;
     }
-  }
+  } // iterate
 
   std::cout << "**********OUTPUT************" << std::endl;
-  std::cout << "VBETA" << std::endl;
-  std::cout << vbeta << std::endl;
+  std::cout << "BETA" << std::endl;
+  std::cout << beta << std::endl;
   std::cout << std::endl;
-  std::cout << "new_err2 " << new_err2 << std::endl;
+  std::cout << "err2_next " << err2_next << std::endl;
 
-        return vbeta;
+        return beta;
 }
 
 
@@ -434,7 +532,7 @@ int main(int argc, char **argv)
 {
   int i;
   point_data cur_point;
-  point_data_list points2;
+  point_data_list points;
 
   double k = 1024.0;
   double tx = 10.0;
@@ -443,8 +541,8 @@ int main(int argc, char **argv)
   double rx = 0.0;
   double ry = 45.0;
   double rz = 0.0;
-  Eigen::VectorXd vbeta(7);
-  Eigen::VectorXd vbeta_solved;
+  Eigen::VectorXd beta(7);
+  Eigen::VectorXd beta_solved;
 
   if(argc < 1)
   {
@@ -454,8 +552,9 @@ int main(int argc, char **argv)
   }
 
   // Set up beta vector with initial estimate of camera parameters.
-        vbeta << k, tx, ty, tz, rx, ry, rz;
+        beta << k, tx, ty, tz, rx, ry, rz;
 
+  function_object_list r;
   for(i = 0;i < NUM_POINTS;i++)
   {
     cur_point.x = points_raw[i].x;
@@ -464,26 +563,35 @@ int main(int argc, char **argv)
     // Ad-hoc subtractions to make the optical center of the image (0,0)
     cur_point.xp = points_raw[i].xp - 1632.0;
     cur_point.yp = points_raw[i].yp - 1224.0;
+    functionObject r0(cur_point.xp, cur_point.yp, cur_point.x,
+        cur_point.y, cur_point.z, 2 * i);
+    functionObject r1(cur_point.xp, cur_point.yp, cur_point.x,
+        cur_point.y, cur_point.z, 2 * i + 1);
 
-    points2.push_back(cur_point);
+    points.push_back(cur_point);
+    r.push_back(r0);
+    r.push_back(r1);
   }
 
-  PointDataListPrint3(points2);
+  PointDataListPrint3(points);
 
   std::cout << std::endl;
 
   std::cout << "**********INPUT************" << std::endl;
-  std::cout << "VBETA" << std::endl;
-  std::cout << vbeta << std::endl;
+  std::cout << "BETA" << std::endl;
+  std::cout << beta << std::endl;
   std::cout << std::endl;
 
-  vbeta_solved = Solve(points2, vbeta);
+  beta_solved = Solve(r, beta);
 
-  std::cout << "VBETA SOLVED" << std::endl;
-  std::cout << vbeta_solved << std::endl;
+  std::cout << "BETA SOLVED" << std::endl;
+  std::cout << beta_solved << std::endl;
   std::cout << std::endl;
 
-  PointDataListPrint4(points2, vbeta_solved);
+  printf("r %f\n", r[11](beta_solved));
+  printf("eval %f\n", EvalRFunction(11, points, beta_solved));
+
+  PointDataListPrint4(r, beta_solved);
 
   return 0;
 }
