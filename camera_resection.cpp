@@ -71,6 +71,8 @@ SOFTWARE.
 #include <vector>
 #include <Eigen/Dense>
 
+#include "function_object.h"
+
 #define DEG_TO_RAD (M_PI / 180.0)
 
 #define NUM_POINTS 6
@@ -99,6 +101,7 @@ PointData points_raw[] = {
   { 2265.0, 174.0, 2.822, 0.0, 1.486 }
 };
 
+/***
 class FunctionObject
 {
   public:
@@ -203,6 +206,7 @@ class FunctionObject
     double _x3d, _y3d, _z3d;
     int _indx;
 };
+****/
 
 typedef std::vector<FunctionObject> FunctionObjectList;
 
@@ -331,7 +335,6 @@ Eigen::MatrixXd Jacobian(FunctionObjectList& r, Eigen::VectorXd& beta)
 double CalcErr2(FunctionObjectList& r, Eigen::VectorXd beta)
 {
   Eigen::VectorXd vcol = EvalRFunctionVector(r, beta);
-  //return GetErr2(EvalRFunctionVector(r, beta));
   return GetErr2(vcol);
 }
 
