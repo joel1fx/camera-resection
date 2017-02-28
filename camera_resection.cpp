@@ -77,20 +77,20 @@ SOFTWARE.
 #define NUM_VARS 7
 
 
-typedef struct point_data
+typedef struct PointData
 {
   double xp;
   double yp;
   double x;
   double y;
   double z;
-} point_data;
+} PointData;
 
-typedef std::vector<point_data> point_data_list;
+typedef std::vector<PointData> PointDataList;
 
 // x_screen y_screen x_3d y_3d z_3d for each test point
 
-point_data points_raw[] = {
+PointData points_raw[] = {
   { 1464.0, 924.0, 0.017, 0.0, 0.017},
   { 1431.0, 2346.0, 0.0, 2.682, 0.0},
   { 431.0, 651.0, 0.247, 0.0, 2.089 },
@@ -99,16 +99,12 @@ point_data points_raw[] = {
   { 2265.0, 174.0, 2.822, 0.0, 1.486 }
 };
 
-class functionObject
+class FunctionObject
 {
-  private:
-    double _xp, _yp;
-    double _x3d, _y3d, _z3d;
-    int _indx;
   public:
-    functionObject(double xp, double yp, double x3d, double y3d, double z3d,
-        int indx) : _xp(xp), _yp(yp), _x3d(x3d), _y3d(y3d), _z3d(z3d),
-        _indx(indx) {}
+    FunctionObject(double xp, double yp, double x3d, double y3d, double z3d,
+                   int indx) : _xp(xp), _yp(yp), _x3d(x3d), _y3d(y3d),
+                   _z3d(z3d), _indx(indx) {}
 
     double xp()
     {
@@ -148,10 +144,16 @@ class functionObject
         ret = _yp - EvalBackProject(beta);
       }
 
-      //printf("_xp %f _yp %f\n", _xp, _yp);
-      //printf("EvalBackProject(beta) %f\n", EvalBackProject(beta));
       return ret;
     }
+
+    // If _indx is even, calculate the x screen coordinate of point number
+    // _indx/2, given the 3d coordinates (_x3d, _y3d, _z3d) of the point
+    // and the camera parameters (beta).
+    // If _indx is odd, calculate the y screen coordinate of point number
+    // (_indx - 1)/2, given the 3d coordinates (_x3d, _y3d, _z3d) of the
+    // point and the camera parameters (beta).
+    // This is called back projection.
 
     double EvalBackProject(Eigen::VectorXd& beta)
     {
@@ -177,7 +179,7 @@ class functionObject
       Eigen::Vector4d pnh2 = m4 * pnh;
       Eigen::Vector3d pn2 = pnh2.hnormalized();
 
-      /* handle case when point is behind camera */
+      // handle case when point is behind camera
       if(pn2[2] > 0.0)
       {
         return 1.e10;
@@ -195,24 +197,27 @@ class functionObject
 
       return ret;
     }
+
+  private:
+    double _xp, _yp;
+    double _x3d, _y3d, _z3d;
+    int _indx;
 };
 
-typedef std::vector<functionObject> function_object_list;
+typedef std::vector<FunctionObject> FunctionObjectList;
 
 
 // Print x_screen y_screen x_3d y_3d z_3d for each point
 
-void PointDataListPrint3(point_data_list& a)
+void PointDataListPrint3(PointDataList& a)
 {
-  int n;
-
   std::cout << std::endl << "type: Point_Data_List2" << std::endl;
-  n = a.size();
-  std::cout << "num elements: " << n << std::endl;
+  int size = a.size();
+  std::cout << "num elements: " << size << std::endl;
 
   std::cout.setf(std::ios::fixed, std::ios::floatfield);
   std::cout.precision(6);
-  for(int i = 0;i < n;i++)
+  for(int i = 0;i < size;i++)
   {
     std::cout << std::setw(12) << a[i].xp << " " << \
       std::setw(12) << a[i].yp << "   " << \
@@ -239,61 +244,9 @@ double GetErr2(Eigen::VectorXd& a)
 }
 
 
-// If i is even, calculate the x screen coordinate of point number i/2,
-// given the 3d coordinates of the point and the camera parameters.
-// If i is odd, calculate the y screen coordinate of point number (i-1)/2,
-// given the 3d coordinates of the point and the camera parameters.
-// This is called back projection.
-
-double EvalBackProject(point_data_list& points, Eigen::VectorXd& beta, int i)
-{
-  double ret;
-
-  int i2 = i / 2;
-
-  double k = beta[0];
-  double tx = beta[1];
-  double ty = beta[2];
-  double tz = beta[3];
-  double rx = beta[4] * DEG_TO_RAD; 
-  double ry = beta[5] * DEG_TO_RAD;
-  double rz = beta[6] * DEG_TO_RAD;
-
-  Eigen::Affine3d rya = Eigen::Affine3d(Eigen::AngleAxisd(-ry,
-    Eigen::Vector3d::UnitY()));
-  Eigen::Affine3d rxa = Eigen::Affine3d(Eigen::AngleAxisd(-rx,
-    Eigen::Vector3d::UnitX()));
-  Eigen::Affine3d rza = Eigen::Affine3d(Eigen::AngleAxisd(-rz,
-    Eigen::Vector3d::UnitZ()));
-  Eigen::Affine3d t1(Eigen::Translation3d(-tx,-ty,-tz));
-
-  Eigen::Matrix4d m4 = (rza * rxa * rya * t1).matrix();
-  Eigen::Vector3d pn(points[i2].x, points[i2].y, points[i2].z);
-  Eigen::Vector4d pnh = pn.homogeneous();
-  Eigen::Vector4d pnh2 = m4 * pnh;
-  Eigen::Vector3d pn2 = pnh2.hnormalized();
-
-  /* handle case when point is behind camera */
-  if(pn2[2] > 0.0)
-  {
-    return 1.e10;
-  }
-
-  if(i % 2 == 0)
-  {
-    ret = k * pn2[0] / -pn2[2];
-  }
-  else
-  {
-    ret = k * pn2[1] / -pn2[2];
-  }
-
-  return ret;
-}
-
 // Prints data
 
-void PointDataListPrint4(function_object_list& r, Eigen::VectorXd& beta)
+void PointDataListPrint4(FunctionObjectList& r, Eigen::VectorXd& beta)
 {
   std::cout << std::endl << "type: Point_Data_List2" << std::endl;
   int size = r.size() >> 1;
@@ -317,29 +270,11 @@ void PointDataListPrint4(function_object_list& r, Eigen::VectorXd& beta)
   return;
 }
 
-// Evaluate function r[i]
-
-double EvalRFunction(int i, point_data_list& points, Eigen::VectorXd& beta)
-{
-  double ret;
-
-  int i2 = i / 2;
-  if(i % 2 == 0)
-  {
-    ret = points[i2].xp - EvalBackProject(points, beta, i);
-  }
-  else
-  {
-    ret = points[i2].yp - EvalBackProject(points, beta, i);
-  }
-
-  return ret;
-}
-
 
 // Evaluate r function vector
 
-Eigen::VectorXd EvalRFunctionVector(function_object_list& r, Eigen::VectorXd& beta)
+Eigen::VectorXd EvalRFunctionVector(FunctionObjectList& r,
+    Eigen::VectorXd& beta)
 {
   int num_conds = r.size();
   Eigen::VectorXd ret(num_conds);
@@ -355,7 +290,7 @@ Eigen::VectorXd EvalRFunctionVector(function_object_list& r, Eigen::VectorXd& be
 
 // Get partial derivative
 
-double GetPartialD(int i, int indx, function_object_list& r,
+double GetPartialD(int i, int indx, FunctionObjectList& r,
     Eigen::VectorXd& beta)
 {
   double epsilon = 0.001;
@@ -374,7 +309,7 @@ double GetPartialD(int i, int indx, function_object_list& r,
 
 // Calculate Jacobian
 
-Eigen::MatrixXd Jacobian(function_object_list& r, Eigen::VectorXd& beta)
+Eigen::MatrixXd Jacobian(FunctionObjectList& r, Eigen::VectorXd& beta)
 {
   int num_conds = r.size();
   Eigen::MatrixXd ret(num_conds, beta.size());
@@ -393,15 +328,11 @@ Eigen::MatrixXd Jacobian(function_object_list& r, Eigen::VectorXd& beta)
 
 // Calculates the error of the function vector.
 
-double CalcErr2(function_object_list& r, Eigen::VectorXd beta)
+double CalcErr2(FunctionObjectList& r, Eigen::VectorXd beta)
 {
-  double err2;
-  Eigen::VectorXd r_vec;
-
-  r_vec = EvalRFunctionVector(r, beta);
-  err2 = GetErr2(r_vec);
-
-  return err2;
+  Eigen::VectorXd vcol = EvalRFunctionVector(r, beta);
+  //return GetErr2(EvalRFunctionVector(r, beta));
+  return GetErr2(vcol);
 }
 
 
@@ -422,29 +353,17 @@ double CalcErr2(function_object_list& r, Eigen::VectorXd beta)
 //  (J^T*J)^-1*J^T * r(beta_current)
 //
 
-Eigen::VectorXd CalcDiff(function_object_list& r, Eigen::VectorXd& beta)
+Eigen::VectorXd CalcDiff(FunctionObjectList& r, Eigen::VectorXd& beta)
 {
-  Eigen::VectorXd vcol;
-  Eigen::MatrixXd ejf;
-  Eigen::MatrixXd ejft;
-  Eigen::MatrixXd ejf2;
-  Eigen::MatrixXd ejf_inv;
-  Eigen::MatrixXd ejf3;
-  Eigen::VectorXd ediff;
+  Eigen::MatrixXd ejf = Jacobian(r, beta);
 
-  ejf = Jacobian(r, beta);
-  ejft = ejf.transpose();
-  ejf2 = ejft * ejf;
+  Eigen::MatrixXd ejft = ejf.transpose();
+  Eigen::MatrixXd ejf2 = ejft * ejf;
+  Eigen::MatrixXd ejf3 = ejf2.inverse() * ejft;
 
-  ejf_inv = ejf2.inverse();
+  Eigen::MatrixXd vcol = EvalRFunctionVector(r, beta);
 
-  ejf3 = ejf_inv * ejft;
-
-  vcol = EvalRFunctionVector(r, beta);
-
-  ediff = ejf3 * vcol;
-
-  return ediff;
+  return ejf3 * vcol;
 }
 
 
@@ -452,15 +371,11 @@ Eigen::VectorXd CalcDiff(function_object_list& r, Eigen::VectorXd& beta)
 //  "dialling back" the next iteration of the beta vector until it's less
 //  than the current beta vector.
 
-Eigen::VectorXd Solve(function_object_list& r, Eigen::VectorXd& beta)
+Eigen::VectorXd Solve(FunctionObjectList& r, Eigen::VectorXd& beta)
 {
-  double err2_next;
-  Eigen::VectorXd ediff;
-  Eigen::VectorXd beta_next;
-  Eigen::VectorXd beta_min;
+  std::cout << "Entering Solve" << std::endl;
 
-  std::cout << "Here in Solve" << std::endl;
-
+  double err2_min;
   /* iterate loop */
   for(int j = 0;j < 100;j++)
   {
@@ -471,25 +386,25 @@ Eigen::VectorXd Solve(function_object_list& r, Eigen::VectorXd& beta)
     std::cout << std::endl;
 
     double err2 = CalcErr2(r, beta);
-    ediff = CalcDiff(r, beta);
+    Eigen::VectorXd ediff = CalcDiff(r, beta);
 
     std::cout << "err2 (orig) " << err2 << std::endl;
 
     double atten = 1.0;
-    double err2_min = err2;
-    beta_min = beta;
+    err2_min = err2;
+    Eigen::VectorXd beta_min = beta;
     for(int j1 = 0;j1 < 20;j1++)
     {
-      beta_next = atten * ediff + beta;
+      Eigen::VectorXd beta_next = atten * ediff + beta;
 
-      err2_next = CalcErr2(r, beta_next);
-      std::cout << "j1 " << j1 << " atten " << atten << " err2_next " << err2_next << std::endl;
+      double err2_next = CalcErr2(r, beta_next);
+      std::cout << "j1 " << j1 << " atten " << atten << " err2_next " <<
+          err2_next << std::endl;
       if(err2_next < err2_min)
       {
         err2_min = err2_next;
         beta_min = beta_next;
         atten *= 0.7;
-        //break;
       }
       else
       {
@@ -520,9 +435,9 @@ Eigen::VectorXd Solve(function_object_list& r, Eigen::VectorXd& beta)
   std::cout << "BETA" << std::endl;
   std::cout << beta << std::endl;
   std::cout << std::endl;
-  std::cout << "err2_next " << err2_next << std::endl;
+  std::cout << "err2_min " << err2_min << std::endl;
 
-        return beta;
+  return beta;
 }
 
 
@@ -530,9 +445,7 @@ Eigen::VectorXd Solve(function_object_list& r, Eigen::VectorXd& beta)
 
 int main(int argc, char **argv)
 {
-  int i;
-  point_data cur_point;
-  point_data_list points;
+  PointDataList points;
 
   double k = 1024.0;
   double tx = 10.0;
@@ -554,18 +467,19 @@ int main(int argc, char **argv)
   // Set up beta vector with initial estimate of camera parameters.
         beta << k, tx, ty, tz, rx, ry, rz;
 
-  function_object_list r;
-  for(i = 0;i < NUM_POINTS;i++)
+  FunctionObjectList r;
+  for(int i = 0;i < NUM_POINTS;i++)
   {
+    PointData cur_point;
     cur_point.x = points_raw[i].x;
     cur_point.y = points_raw[i].y;
     cur_point.z = points_raw[i].z;
     // Ad-hoc subtractions to make the optical center of the image (0,0)
     cur_point.xp = points_raw[i].xp - 1632.0;
     cur_point.yp = points_raw[i].yp - 1224.0;
-    functionObject r0(cur_point.xp, cur_point.yp, cur_point.x,
+    FunctionObject r0(cur_point.xp, cur_point.yp, cur_point.x,
         cur_point.y, cur_point.z, 2 * i);
-    functionObject r1(cur_point.xp, cur_point.yp, cur_point.x,
+    FunctionObject r1(cur_point.xp, cur_point.yp, cur_point.x,
         cur_point.y, cur_point.z, 2 * i + 1);
 
     points.push_back(cur_point);
@@ -589,7 +503,7 @@ int main(int argc, char **argv)
   std::cout << std::endl;
 
   printf("r %f\n", r[11](beta_solved));
-  printf("eval %f\n", EvalRFunction(11, points, beta_solved));
+  // printf("eval %f\n", EvalRFunction(11, points, beta_solved));
 
   PointDataListPrint4(r, beta_solved);
 
