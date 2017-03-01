@@ -9,7 +9,7 @@ GNSolver class implements the Gauss-Newton solver, FunctionObject class
 implements each function.
 
 ## Github page
-http://joel1fx.github.io/camera_resection/
+http://joel1fx.github.io/camera-resection/
 
 ## Installation
 
