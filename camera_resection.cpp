@@ -25,11 +25,6 @@ SOFTWARE.
 
 ***************************************************************************/
 
-/*  This is a Work in Progress. It is a single file which sets up and runs  */
-/*  its own single test case.                                               */
-
-/*  To build:  g++ -Wall -O2 camera_resection.cpp -o camera_resection       */
-
 /*  This repo contains a function to perform camera resection. That is,     */
 /*  determining the camera's position, orientation and pixel multiplier     */
 /*  given the 2d screen coordinates and 3d cartesian coordinates of a       */
@@ -65,15 +60,13 @@ SOFTWARE.
 /*  its calculated 2d position based on its 3d coordinates and the camera   */
 /*  parameters.                                                             */
 
-#include <cmath>
 #include <iostream>
 #include <iomanip>
 #include <vector>
 #include <Eigen/Dense>
 
 #include "function_object.h"
-
-#define DEG_TO_RAD (M_PI / 180.0)
+#include "g_n_solver.h"
 
 #define NUM_POINTS 6
 
@@ -102,7 +95,7 @@ PointData points_raw[] = {
 
 // Print x_screen y_screen x_3d y_3d z_3d for each point
 
-void PointDataListPrint3(PointDataList& a)
+void PointDataListPrint3(PointDataList const &a)
 {
   std::cout << std::endl << "type: Point_Data_List2" << std::endl;
   int size = a.size();
@@ -122,12 +115,11 @@ void PointDataListPrint3(PointDataList& a)
   return;
 }
 
-typedef std::vector<FunctionObject> FunctionObjectList;
-
 
 // Prints data
 
-void PointDataListPrint4(FunctionObjectList& r, Eigen::VectorXd& beta)
+void PointDataListPrint4(FunctionObjectList const &r,
+                         Eigen::VectorXd const &beta)
 {
   std::cout << std::endl << "type: Point_Data_List2" << std::endl;
   int size = r.size() >> 1;
@@ -150,183 +142,6 @@ void PointDataListPrint4(FunctionObjectList& r, Eigen::VectorXd& beta)
 
   return;
 }
-
-class GNSolver
-{
-  public:
-    GNSolver() {}
-    // Return the length squared of vector a
-    double GetErr2(Eigen::VectorXd& a)
-    {
-      double ret = 0.0;
-      for(int i = 0;i < a.size();i++)
-      {
-        ret += a[i] * a[i];
-      }
-
-      return ret;
-    }
-
-    // Evaluate r function vector
-    Eigen::VectorXd EvalRFunctionVector(FunctionObjectList& r,
-        Eigen::VectorXd& beta)
-    {
-      int num_conds = r.size();
-      Eigen::VectorXd ret(num_conds);
-
-      for(int i = 0;i < num_conds;i++)
-      {
-        ret[i] = r[i](beta);
-      }
-
-      return ret;
-    }
-
-
-    // Get partial derivative
-    double GetPartialD(int i, int indx, FunctionObjectList& r,
-        Eigen::VectorXd& beta)
-    {
-      double epsilon = 0.001;
-
-      Eigen::VectorXd beta_epsilon = beta;
-      beta_epsilon[indx] += epsilon;
-
-      double ret = r[i].EvalBackProject(beta);
-      double ret_epsilon = r[i].EvalBackProject(beta_epsilon);
-
-      double partd = (ret_epsilon - ret) / epsilon;
-
-      return partd;
-    }
-
-    // Calculate Jacobian
-    Eigen::MatrixXd Jacobian(FunctionObjectList& r, Eigen::VectorXd& beta)
-    {
-      int num_conds = r.size();
-      Eigen::MatrixXd ret(num_conds, beta.size());
-
-      for(int i = 0;i < num_conds;i++)
-      {
-        for(int j = 0;j < beta.size();j++)
-        {
-          ret(i, j) = GetPartialD(i, j, r, beta);
-        }
-      }
-
-      return ret;
-    }
-
-    // Calculates the error of the function vector.
-    double CalcErr2(FunctionObjectList& r, Eigen::VectorXd beta)
-    {
-      Eigen::VectorXd vcol = EvalRFunctionVector(r, beta);
-
-      return GetErr2(vcol);
-    }
-
-    //  The Gauss-Newton algorithm calculates successive approximations of the
-    //  beta vector by the following equation:
-    //
-    //  beta_next = beta_current - (J^T*J)^-1*J^T * r(beta_current)
-    //
-    //  where:
-    //  beta_next is the next iteration of the beta vector
-    //  beta_current is the current iteration of the beta vector
-    //  J is the Jacobian matrix
-    //  J^T is the transpose of the Jacobian matrix
-    //  r is the r vector of functions to be minimized
-    //
-    //  CalcDiff calculates and returns this part:
-    //
-    //  (J^T*J)^-1*J^T * r(beta_current)
-    //
-
-    Eigen::VectorXd CalcDiff(FunctionObjectList& r, Eigen::VectorXd& beta)
-    {
-      Eigen::MatrixXd ejf = Jacobian(r, beta);
-
-      Eigen::MatrixXd ejft = ejf.transpose();
-      Eigen::MatrixXd ejf2 = ejft * ejf;
-      Eigen::MatrixXd ejf3 = ejf2.inverse() * ejft;
-
-      Eigen::MatrixXd vcol = EvalRFunctionVector(r, beta);
-
-      return ejf3 * vcol;
-    }
-
-    //  The main solver, iterates to improve the beta vector, including
-    //  "dialling back" the next iteration of the beta vector until it's less
-    //  than the current beta vector.
-    Eigen::VectorXd operator()(FunctionObjectList& r, Eigen::VectorXd& beta)
-    {
-      std::cout << "Entering Solve" << std::endl;
-
-      double err2_min;
-      // iterate loop
-      for(int j = 0;j < 100;j++)
-      {
-        std::cout << "iteration " << j << std::endl;
-
-        std::cout << "BETA" << std::endl;
-        std::cout << beta << std::endl;
-        std::cout << std::endl;
-
-        double err2 = CalcErr2(r, beta);
-        Eigen::VectorXd ediff = CalcDiff(r, beta);
-
-        std::cout << "err2 (orig) " << err2 << std::endl;
-
-        double atten = 1.0;
-        err2_min = err2;
-        Eigen::VectorXd beta_min = beta;
-        for(int j1 = 0;j1 < 20;j1++)
-        {
-          Eigen::VectorXd beta_next = atten * ediff + beta;
-
-          double err2_next = CalcErr2(r, beta_next);
-          std::cout << "j1 " << j1 << " atten " << atten << " err2_next " <<
-              err2_next << std::endl;
-          if(err2_next < err2_min)
-          {
-            err2_min = err2_next;
-            beta_min = beta_next;
-            atten *= 0.7;
-          }
-          else
-          {
-            atten *= 0.7;
-          }
-        }
-
-        beta = beta_min;
-
-        // stop iterating if the error is almost zero
-        if(err2_min < 0.0000001)
-        {
-          std::cout << "solved" << std::endl;
-
-          break;
-        }
-
-        // stop iterating if the error has decreased minimally
-        if(err2_min / err2 > 0.99999)
-        {
-          std::cout << "converged" << std::endl;
-
-          break;
-        }
-      } // iterate
-
-      std::cout << "**********OUTPUT************" << std::endl;
-      std::cout << "BETA" << std::endl;
-      std::cout << beta << std::endl;
-      std::cout << std::endl;
-      std::cout << "err2_min " << err2_min << std::endl;
-
-      return beta;
-    }
-};
 
 
 // Main sets up the current hard-wired test

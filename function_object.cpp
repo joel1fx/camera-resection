@@ -27,36 +27,37 @@ SOFTWARE.
 
 #include "function_object.h"
 
+#include <vector>
 #include <Eigen/Dense>
 
 #define DEG_TO_RAD (M_PI / 180.0)
 
-double FunctionObject::xp()
+double FunctionObject::xp() const
 {
   return _xp;
 }
 
-double FunctionObject::yp()
+double FunctionObject::yp() const
 {
   return _yp;
 }
 
-double FunctionObject::x3d()
+double FunctionObject::x3d() const
 {
   return _x3d;
 }
 
-double FunctionObject::y3d()
+double FunctionObject::y3d() const
 {
   return _y3d;
 }
 
-double FunctionObject::z3d()
+double FunctionObject::z3d() const
 {
   return _z3d;
 }
 
-double FunctionObject::operator()(Eigen::VectorXd& beta)
+double FunctionObject::operator()(Eigen::VectorXd const &beta) const
 {
   double ret;
 
@@ -80,7 +81,7 @@ double FunctionObject::operator()(Eigen::VectorXd& beta)
 // point and the camera parameters (beta).
 // This is called back projection.
 
-double FunctionObject::EvalBackProject(Eigen::VectorXd& beta)
+double FunctionObject::EvalBackProject(Eigen::VectorXd const &beta) const
 {
   double k = beta[0];
   double tx = beta[1];

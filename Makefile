@@ -23,7 +23,7 @@
 # SOFTWARE.
 #
 
-LIB_OBJS=function_object.o
+LIB_OBJS=function_object.o g_n_solver.o
 
 CXX_FLAGS=-Wall -O2
 
@@ -32,6 +32,9 @@ camera_resection: camera_resection.o $(LIB_OBJS)
 
 function_object.o: function_object.cpp function_object.h
 	$(CXX) $(CXX_FLAGS) -c function_object.cpp
+
+g_n_solver.o: g_n_solver.cpp g_n_solver.h
+	$(CXX) $(CXX_FLAGS) -c g_n_solver.cpp
 
 camera_resection.o: camera_resection.cpp function_object.h
 	$(CXX) $(CXX_FLAGS) -c camera_resection.cpp

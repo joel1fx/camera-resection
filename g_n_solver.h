@@ -1,5 +1,5 @@
-#ifndef CAMERA_RESECTION_FUNCTION_OBJECT_H_
-#define CAMERA_RESECTION_FUNCTION_OBJECT_H_
+#ifndef CAMERA_RESECTION_G_N_SOLVER_H_
+#define CAMERA_RESECTION_G_N_SOLVER_H_
 
 /***************************************************************************
 
@@ -27,32 +27,34 @@ SOFTWARE.
 
 ***************************************************************************/
 
-#include <vector>
 #include <Eigen/Dense>
 
-class FunctionObject
+#include "function_object.h"
+
+class GNSolver
 {
   public:
-    // Constructor
-    FunctionObject(double xp, double yp, double x3d, double y3d, double z3d,
-                   int indx) : _xp(xp), _yp(yp), _x3d(x3d), _y3d(y3d),
-                   _z3d(z3d), _indx(indx) {}
-    // Getter functions
-    double xp() const;
-    double yp() const;
-    double x3d() const;
-    double y3d() const;
-    double z3d() const;
-    // Evaluate function
-    double operator()(Eigen::VectorXd const &beta) const;
-    // Evaluate back projection
-    double EvalBackProject(Eigen::VectorXd const &beta) const;
-  private:
-    double _xp, _yp;
-    double _x3d, _y3d, _z3d;
-    int _indx;
+    GNSolver() {}
+
+    double GetErr2(Eigen::VectorXd const &a) const;
+
+    Eigen::VectorXd EvalRFunctionVector(FunctionObjectList const &r,
+                                        Eigen::VectorXd const &beta) const;
+
+    double GetPartialD(int i, int indx, FunctionObjectList const &r,
+                       Eigen::VectorXd const &beta) const;
+
+    Eigen::MatrixXd Jacobian(FunctionObjectList const &r,
+                             Eigen::VectorXd const &beta) const;
+
+    double CalcErr2(FunctionObjectList const &r,
+                    Eigen::VectorXd const &beta) const;
+
+    Eigen::VectorXd CalcDiff(FunctionObjectList const &r,
+                             Eigen::VectorXd const &beta) const;
+
+    Eigen::VectorXd operator()(FunctionObjectList const &r,
+                               Eigen::VectorXd &beta) const;
 };
 
-typedef std::vector<FunctionObject> FunctionObjectList;
-
-#endif // CAMERA_RESECTION_FUNCTION_OBJECT_H_
+#endif // CAMERA_RESECTION_G_N_SOLVER_H_
