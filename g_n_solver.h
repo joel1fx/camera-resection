@@ -31,11 +31,26 @@ SOFTWARE.
 
 #include "function_object.h"
 
+
+// Gauss-Newton algorithm solver.
+//
+// https://en.wikipedia.org/wiki/Gauss-Newton_algorithm
+//
+// Example:
+//    Eigen::VectorXd beta(7);
+//    beta << k, tx, ty, tz, rx, ry, rz;
+//    FunctionObjectList r;
+//    intialize r...
+//    Eigen::VectorXd beta_solved = GNSolver()(r, beta);
+
 class GNSolver
 {
   public:
     GNSolver() {}
 
+    Eigen::VectorXd operator()(FunctionObjectList const &r,
+                               Eigen::VectorXd &beta) const;
+  private:
     double GetErr2(Eigen::VectorXd const &a) const;
 
     Eigen::VectorXd EvalRFunctionVector(FunctionObjectList const &r,
@@ -52,9 +67,6 @@ class GNSolver
 
     Eigen::VectorXd CalcDiff(FunctionObjectList const &r,
                              Eigen::VectorXd const &beta) const;
-
-    Eigen::VectorXd operator()(FunctionObjectList const &r,
-                               Eigen::VectorXd &beta) const;
 };
 
 #endif // CAMERA_RESECTION_G_N_SOLVER_H_

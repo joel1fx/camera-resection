@@ -67,10 +67,10 @@ double GNSolver::GetPartialD(int i, int indx, FunctionObjectList const &r,
   Eigen::VectorXd beta_epsilon = beta;
   beta_epsilon[indx] += epsilon;
 
-  double ret = r[i].EvalBackProject(beta);
-  double ret_epsilon = r[i].EvalBackProject(beta_epsilon);
+  double ret = r[i](beta);
+  double ret_epsilon = r[i](beta_epsilon);
 
-  double partd = (ret_epsilon - ret) / epsilon;
+  double partd = (ret - ret_epsilon) / epsilon;
 
   return partd;
 }
