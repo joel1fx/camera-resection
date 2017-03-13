@@ -19,7 +19,7 @@
           <a id="forkme_banner" href="https://github.com/joel1fx/camera-resection">View on GitHub</a>
 
           <h1 id="project_title">Camera resection</h1>
-          <h2 id="project_tagline">Gets camera position and orientation</h2>
+          <h2 id="project_tagline">Gets camera position, orientation, and pixel scale</h2>
 
             <section id="downloads">
               <a class="zip_download_link" href="https://github.com/joel1fx/camera-resection/zipball/master">Download this project as a .zip file</a>
@@ -32,14 +32,21 @@
     <div id="main_content_wrap" class="outer">
       <section id="main_content" class="inner">
         <h3>
-<a id="camera-resection-viewer" class="anchor" href="#camera-resection-viewer" aria-hidden="true"><span class="octicon octicon-link"></span></a>Camera Resection viewer</h3>
+<a id="camera-resection-solver" class="anchor" href="#camera-resection-solver" aria-hidden="true"><span class="octicon octicon-link"></span></a>Camera Resection solver</h3>
 
-<p>Camera resection</p>
+<p>This Camera Resection solver consists of two C++ classes which calculate camera position,
+  orientation, and pixel scale, given points with known 3d and screen coordinates.</p>
 
 <h3>
 <a id="description" class="anchor" href="#description" aria-hidden="true"><span class="octicon octicon-link"></span></a>Description</h3>
 
-<p>Camera resection description</p>
+<p>Camera resection is the process of determining the camera location (tx, ty, tz), rotations (rx, ry, rz), and
+        pixel scale (kx), given points with 3d and screen coordinates.</p>
+        <p>By convention the location coordinates are right handed, with positive x pointing to the right,
+        positive y pointing up, and positive z pointing forward. The rotations are right handed about
+        their respective axes, with a zxy rotate order. So the rotates behave like a standard tripod pad head.
+        Positive rx means tilt up, positive ry means pan left, and positive rz means roll counter-clockwise when
+        viewed from behind the camera.</p>
       </section>
     </div>
 
