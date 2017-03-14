@@ -1,17 +1,20 @@
 ## camera-resection
 
-Computes camera position and orientation, given points' coordinates. Uses a
+Computes camera position, rotations, and pixel scale parameters, given points' 3d and screen coordinates. Uses a
 modified Gauss-Newton non-linear solver.
 
 ## Motivation
 
-GNSolver class implements the Gauss-Newton solver, FunctionObject class
-implements each function.
+A useful library for obtaining camera calibration data.
 
 ## Github page
 http://joel1fx.github.io/camera-resection/
 
 ## Installation
+
+Make sure Eigen is installed. If it is installed in a non-standard path, you will need to edit the Makefile.
+
+http://eigen.tuxfamily.org/index.php?title=Main_Page
 
 Download the repo and
 ```
