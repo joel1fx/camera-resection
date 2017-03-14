@@ -25,12 +25,25 @@ SOFTWARE.
 
 ***************************************************************************/
 
+//  This module defines the GNSolver (Gauss-Newton Solver) class whose
+//  objects solve the camera resection (calibration) described in
+//  main.cpp.
+
 #include "g_n_solver.h"
 
 #include <iostream>
 #include <Eigen/Dense>
 
-// Return the length squared of vector a
+
+//
+//  Member Function: GNSolver::GetErr2
+//
+//  Return the length squared of input vector.
+//
+//  Input parameters:
+//  a -- vector to calculate length squared
+//
+
 double GNSolver::GetErr2(Eigen::VectorXd const &a) const
 {
   double ret = 0.0;
@@ -42,7 +55,18 @@ double GNSolver::GetErr2(Eigen::VectorXd const &a) const
   return ret;
 }
 
-// Evaluate r function vector
+
+//
+//  Member Function: GNSolver::EvalRFunctionVector
+//
+//  Return the vector containing the outputs of the r functions.
+//
+//  Input parameters:
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
+
 Eigen::VectorXd GNSolver::EvalRFunctionVector(FunctionObjectList const &r,
                                               Eigen::VectorXd const &beta)
                                               const
@@ -58,14 +82,27 @@ Eigen::VectorXd GNSolver::EvalRFunctionVector(FunctionObjectList const &r,
   return ret;
 }
 
-// Get partial derivative
-double GNSolver::GetPartialD(int i, int indx, FunctionObjectList const &r,
+
+//
+//  Member Function: GNSolver::GetPartialD
+//
+//  Return the partial derivative (partial d)r[i] / (partial d)beta[j].
+//
+//  Input parameters:
+//  i    -- row index
+//  j    -- column index
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
+
+double GNSolver::GetPartialD(int i, int j, FunctionObjectList const &r,
                              Eigen::VectorXd const &beta) const
 {
   double epsilon = 0.001;
 
   Eigen::VectorXd beta_epsilon = beta;
-  beta_epsilon[indx] += epsilon;
+  beta_epsilon[j] += epsilon;
 
   double ret = r[i](beta);
   double ret_epsilon = r[i](beta_epsilon);
@@ -75,7 +112,18 @@ double GNSolver::GetPartialD(int i, int indx, FunctionObjectList const &r,
   return partd;
 }
 
-// Calculate Jacobian
+
+//
+//  Member Function: GNSolver::Jacobian
+//
+//  Return the Jacobian matrix of vector function r.
+//
+//  Input parameters:
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
+
 Eigen::MatrixXd GNSolver::Jacobian(FunctionObjectList const &r,
                                    Eigen::VectorXd const &beta) const
 {
@@ -93,7 +141,18 @@ Eigen::MatrixXd GNSolver::Jacobian(FunctionObjectList const &r,
   return ret;
 }
 
-// Calculates the error of the function vector.
+
+//
+//  Member Function: GNSolver::CalcErr2
+//
+//  Return the error of vector function r.
+//
+//  Input parameters:
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
+
 double GNSolver::CalcErr2(FunctionObjectList const &r,
                           Eigen::VectorXd const &beta) const
 {
@@ -102,6 +161,12 @@ double GNSolver::CalcErr2(FunctionObjectList const &r,
   return GetErr2(vcol);
 }
 
+
+//
+//  Member Function: GNSolver::CalcDiff
+//
+//  Return the calculated difference to adjust the beta vector.
+//
 //  The Gauss-Newton algorithm calculates successive approximations of
 //  the beta vector by the following equation:
 //
@@ -118,6 +183,11 @@ double GNSolver::CalcErr2(FunctionObjectList const &r,
 //
 //  (J^T*J)^-1*J^T * r(beta_current)
 //
+//  Input parameters:
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
 
 Eigen::VectorXd GNSolver::CalcDiff(FunctionObjectList const &r,
                                    Eigen::VectorXd const &beta) const
@@ -133,9 +203,22 @@ Eigen::VectorXd GNSolver::CalcDiff(FunctionObjectList const &r,
   return ejf3 * vcol;
 }
 
+
+//
+//  Member Function: GNSolver::operator()
+//
+//  Return the optimized beta vector.
+//
 //  The main solver, iterates to improve the beta vector, including
-//  "dialing back" the next iteration of the beta vector until it's
-//  less than the current beta vector.
+//  "dialing back" the next iteration of the beta vector until it
+//  produces less error than the current beta vector.
+//
+//  Input parameters:
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
+
 Eigen::VectorXd GNSolver::operator()(FunctionObjectList const &r,
                                      Eigen::VectorXd &beta) const
 {

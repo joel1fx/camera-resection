@@ -24,40 +24,54 @@ SOFTWARE.
 
 ***************************************************************************/
 
-/*  This repo contains a function to perform camera resection. That is,     */
-/*  determining the camera's position, orientation and pixel multiplier     */
-/*  given the 2d screen coordinates and 3d cartesian coordinates of a       */
-/*  number of points.                                                       */
+//  TODO: Move testing to test.cpp.
 
-/*  The algorithm uses a Gauss-Newton non-linear least squares solver.      */
-
-/*  https://en.wikipedia.org/wiki/Gauss-Newton_algorithm                    */
-
-/*  This implementation uses zero-based arrays unlike the Wikipedia form.   */
-
-/*  Given there are m functions r[0],r[1],r[2],...r[m - 1], each a          */
-/*  function of n variables beta[0],beta[1],beta[2],...beta[n - 1],         */
-
-/*             m-1                                                          */
-/*   minimize  Sum  ( r[i](beta[0],beta[1]...) )^2                          */
-/*             i=0                                                          */
-
-/*  In this case the r vector of functions is defined as follows:           */
-
-/*  for r[i] where i is even, r[i] is the distance between the measured x   */
-/*  screen coordinate of point number i/2  and the x coordinate of its      */
-/*  back-projection                                                         */
-/*  for r[i] where i is odd, r[i] is the distance between the measured y    */
-/*  screen coordinate of point (i - 1)/2 and the y coordinate of its        */
-/*  back-projection                                                         */
-
-/*  The beta variables correspond to the camera parameters to be            */
-/*  determined.                                                             */
-
-/*  In this case, we adjust the camera parameters to minimize the sum of    */
-/*  the square of the distances between each 2d point in the image and      */
-/*  its calculated 2d position based on its 3d coordinates and the camera   */
-/*  parameters.                                                             */
+//  This repo implements a Gauss-Newton non-linear least squares solver
+//  to do camera resection. That is, the solver determines the camera's
+//  position, orientation and pixel scale given the 2d screen
+//  coordinates and 3d cartesian coordinates of a number of points.
+//
+//  The algorithm uses a Gauss-Newton non-linear least squares solver.
+//
+//  https://en.wikipedia.org/wiki/Gauss-Newton_algorithm
+//
+//  This implementation uses zero-based arrays unlike the Wikipedia form.
+//
+//  Given there are m functions r[0],r[1],r[2],...r[m - 1], each a
+//  function of n variables beta[0],beta[1],beta[2],...beta[n - 1],
+//
+//             m-1
+//   minimize  Sum  ( r[i](beta[0],beta[1]...) )^2
+//             i=0
+//
+//  To implement this two classes are defined. The first,
+//  FunctionObject, represents each element of the r function vector.
+//  The second, GNSolver (Gauss-Newton Solver) implements the actual
+//  solver.
+//
+//  In this implementation the r vector of functions is defined as
+//  follows:
+//
+//  for r[i] where i is even, r[i] is the distance between the measured x
+//  screen coordinate of point number i/2  and the x coordinate of its
+//  back-projection
+//  for r[i] where i is odd, r[i] is the distance between the measured y
+//  screen coordinate of point (i - 1)/2 and the y coordinate of its
+//  back-projection
+//
+//  The beta variables correspond to the camera parameters to be
+//  determined.
+//
+//  In this case, we adjust the camera parameters to minimize the sum of
+//  the square of the distances between each 2d point in the image and
+//  its calculated 2d position based on its 3d coordinates and the
+//  camera parameters.
+//
+//  This main function tests the FunctionObject and GNSolver classes by
+//  constructing objects to test a set of points with known screen
+//  coordinates and 3d coordinates to see if the solver produces a
+//  reasonable solution.
+//
 
 #include <iostream>
 #include <iomanip>
@@ -92,6 +106,17 @@ PointData points_raw[] = {
   { 2265.0, 174.0, 2.822, 0.0, 1.486 }
 };
 
+
+//
+//  Function: PointDataListPrint3
+//
+//  Print point data.
+//  screen x, y; 3d coords x, y, z.
+//
+//  Input parameters:
+//
+//  a -- list of points
+//
 // Print x_screen y_screen x_3d y_3d z_3d for each point
 
 void PointDataListPrint3(PointDataList const &a)
@@ -115,7 +140,18 @@ void PointDataListPrint3(PointDataList const &a)
 }
 
 
-// Prints data
+//
+//  Function: PointDataListPrint4
+//
+//  Print point data.
+//  screen x, y; backprojected x, y; 3d coords x, y, z.
+//
+//  Input parameters:
+//
+//  r    -- vector containing the functions to evaluate
+//  beta -- vector containing camera parameters to optimize, fed into
+//          each r function
+//
 
 void PointDataListPrint4(FunctionObjectList const &r,
                          Eigen::VectorXd const &beta)
@@ -143,7 +179,18 @@ void PointDataListPrint4(FunctionObjectList const &r,
 }
 
 
-// Main sets up the current hard-wired test
+//
+//  Function: main
+//
+//  Execute main program function.
+//
+//  main sets up the current hard-wired test
+//
+//  Input parameters:
+//
+//  argc -- argument count
+//  argv -- argument vector
+//
 
 int main(int argc, char **argv)
 {
@@ -166,9 +213,11 @@ int main(int argc, char **argv)
     return -1;
   }
 
-  // Set up beta vector with initial estimate of camera parameters.
-        beta << k, tx, ty, tz, rx, ry, rz;
+  //  Initialize beta vector with initial estimate of camera parameters.
+  beta << k, tx, ty, tz, rx, ry, rz;
 
+  //  Initialize r function vector, constructing the function of each
+  //  element.
   FunctionObjectList r;
   for(int i = 0;i < NUM_POINTS;i++)
   {
@@ -193,19 +242,21 @@ int main(int argc, char **argv)
 
   std::cout << std::endl;
 
+  // Print initial beta vector.
   std::cout << "**********INPUT************" << std::endl;
   std::cout << "BETA" << std::endl;
   std::cout << beta << std::endl;
   std::cout << std::endl;
 
+  // Solve the problem.
   beta_solved = GNSolver()(r, beta);
 
+  // Print solved beta vector.
   std::cout << "BETA SOLVED" << std::endl;
   std::cout << beta_solved << std::endl;
   std::cout << std::endl;
 
   printf("r %f\n", r[11](beta_solved));
-  // printf("eval %f\n", EvalRFunction(11, points, beta_solved));
 
   PointDataListPrint4(r, beta_solved);
 

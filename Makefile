@@ -27,7 +27,10 @@ LIB_OBJS=function_object.o g_n_solver.o
 
 CXX_FLAGS=-Wall -O2
 
-camera_resection: camera_resection.o $(LIB_OBJS)
+camera_resection: main.o $(LIB_OBJS)
+	$(CXX) $(CXX_FLAGS) -o $@ $^
+
+test: test.o $(LIB_OBJS)
 	$(CXX) $(CXX_FLAGS) -o $@ $^
 
 function_object.o: function_object.cpp function_object.h
@@ -36,8 +39,11 @@ function_object.o: function_object.cpp function_object.h
 g_n_solver.o: g_n_solver.cpp g_n_solver.h
 	$(CXX) $(CXX_FLAGS) -c g_n_solver.cpp
 
-camera_resection.o: camera_resection.cpp function_object.h
-	$(CXX) $(CXX_FLAGS) -c camera_resection.cpp
+main.o: main.cpp function_object.h g_n_solver.h
+	$(CXX) $(CXX_FLAGS) -c main.cpp
+
+test.o: test.cpp function_object.h g_n_solver.h
+	$(CXX) $(CXX_FLAGS) -c test.cpp
 
 clean:
 	rm *.o
