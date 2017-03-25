@@ -95,17 +95,6 @@ typedef struct PointData
 
 typedef std::vector<PointData> PointDataList;
 
-// x_screen y_screen x_3d y_3d z_3d for each test point
-
-PointData points_raw[] = {
-  { 1464.0, 924.0, 0.017, 0.0, 0.017},
-  { 1431.0, 2346.0, 0.0, 2.682, 0.0},
-  { 431.0, 651.0, 0.247, 0.0, 2.089 },
-  { 2850.0, 613.0, 2.704, 0.0, 0.017},
-  { 2839.0, 1448.0, 2.800, 1.065, 0.310},
-  { 2265.0, 174.0, 2.822, 0.0, 1.486 }
-};
-
 
 //
 //  Function: PointDataListPrint3
@@ -206,9 +195,17 @@ int main(int argc, char **argv)
   Eigen::VectorXd beta(7);
   Eigen::VectorXd beta_solved;
 
-  if(argc < 1)
+  if(argc < 2)
   {
-    std::cerr << "usage: " << argv[0] << std::endl;
+    std::cerr << "usage: " << argv[0] << " pointDataFile" << std::endl;
+
+    return -1;
+  }
+
+  FILE *file = fopen(argv[1], "r");
+  if (file == NULL)
+  {
+    std::cerr << "can't open " << argv[1] << std::endl;
 
     return -1;
   }
@@ -219,15 +216,18 @@ int main(int argc, char **argv)
   //  Initialize r function vector, constructing the function of each
   //  element.
   FunctionObjectList r;
-  for(int i = 0;i < NUM_POINTS;i++)
+  int i = 0;
+  while(1)
   {
     PointData cur_point;
-    cur_point.x = points_raw[i].x;
-    cur_point.y = points_raw[i].y;
-    cur_point.z = points_raw[i].z;
-    // Ad-hoc subtractions to make the optical center of the image (0,0)
-    cur_point.xp = points_raw[i].xp - 1632.0;
-    cur_point.yp = points_raw[i].yp - 1224.0;
+    int ret = fscanf(file, "%lf %lf %lf %lf %lf", &cur_point.xp,
+        &cur_point.yp, &cur_point.x, &cur_point.y, &cur_point.z);
+    if(ret != 5)
+    {
+      break;
+    }
+    cur_point.xp -= 1632.0;
+    cur_point.yp -= 1224.0;
     FunctionObject r0(cur_point.xp, cur_point.yp, cur_point.x,
         cur_point.y, cur_point.z, 2 * i);
     FunctionObject r1(cur_point.xp, cur_point.yp, cur_point.x,
@@ -236,8 +236,11 @@ int main(int argc, char **argv)
     points.push_back(cur_point);
     r.push_back(r0);
     r.push_back(r1);
-  }
 
+    i++;
+  }
+  fclose(file);
+ 
   PointDataListPrint3(points);
 
   std::cout << std::endl;
