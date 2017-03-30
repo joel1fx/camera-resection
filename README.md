@@ -14,6 +14,8 @@ http://joel1fx.github.io/camera-resection/
 
 Make sure Eigen is installed. If it is installed in a non-standard path, you will need to edit the Makefile.
 
+For more information about Eigen and its license see:
+
 http://eigen.tuxfamily.org/index.php?title=Main_Page
 
 Download the repo and

@@ -25,7 +25,7 @@
 
 LIB_OBJS=function_object.o g_n_solver.o
 
-CXX_FLAGS=-Wall -O2
+CXX_FLAGS=-Wall -O2 -DEIGEN_MPL2_ONLY
 
 camera_resection: main.o $(LIB_OBJS)
 	$(CXX) $(CXX_FLAGS) -o $@ $^
